@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 /**
  * PantsCompileAllTargetsInModuleAction is a UI action that is used to compile all Pants targets for a module
  */
-public class PantsCompileAllTargetsInModuleAction extends PantsCompileActionBase {
+public class PantsCompileAllTargetsInModuleAction extends PantsActionBase {
 
   private Module myModule;
 

@@ -52,6 +52,7 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.scala.testingSupport.test.AbstractTestRunConfiguration;
 
 import javax.swing.Icon;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -163,6 +164,7 @@ public class PantsMakeBeforeRun extends ExternalSystemBeforeRunTaskProvider {
     return true;
   }
 
+  // compile as default task
   @Override
   public boolean executeTask(
     final DataContext context,
@@ -173,53 +175,67 @@ public class PantsMakeBeforeRun extends ExternalSystemBeforeRunTaskProvider {
     Project currentProject = configuration.getProject();
     prepareIDE(currentProject);
     Set<String> targetAddressesToCompile = PantsUtil.filterGenTargets(getTargetAddressesToCompile(configuration));
-    Pair<Boolean, Optional<String>> result = executeTask(currentProject, targetAddressesToCompile, false);
-    return result.getFirst();
+    TaskExecutionResult result = doCompile(currentProject, targetAddressesToCompile, false);
+    return result.success;
   }
 
-  public Pair<Boolean, Optional<String>> executeTask(Project project) {
-    return executeTask(project, getTargetAddressesToCompile(ModuleManager.getInstance(project).getModules()), false);
-  }
-
-  public Pair<Boolean, Optional<String>> executeTask(@NotNull Module[] modules) {
-    if (modules.length == 0) {
-      return Pair.create(false, Optional.empty());
+  public static class TaskExecutionResult {
+    public final boolean success;
+    public final Optional<String> output;
+    public TaskExecutionResult(boolean success, Optional<String> output) {
+      this.success = success;
+      this.output = output;
     }
-    return executeTask(modules[0].getProject(), getTargetAddressesToCompile(modules), false);
+  }
+
+  public TaskExecutionResult executeTask(@NotNull Module[] modules, String target) {
+    if (modules.length == 0) {
+      return new TaskExecutionResult();
+    }
+    return executeTask(modules[0].getProject(), target, new ArrayList<String>(), getTargetAddressesToCompile(modules));
+  }
+
+  public TaskExecutionResult executeTask(Project currentProject, String target) {
+    Set<String> addresses = getTargetAddressesToCompile(ModuleManager.getInstance(project).getModules());
+    return executeTask(currentProject, target, addresses);
+  }
+
+  public TaskExecutionResult executeTask(Project currentProject, String target, Set<String> addresses) {
+    return executeTask(currentProject, target, new ArrayList<String>(), addresses);
   }
 
   /**
-   * @param currentProject:           current project
-   * @param targetAddressesToCompile: set of target addresses to compile
-   * @param useCleanAll:              whether to use clean-all first in Pants
+   * @param currentProject:  current project
+   * @param target:          pants action to perform, e.g. "compile"
+   * @param description:     human-readable description of action
+   * @param preTargetArgs:   arguments to pants command inserted before the action to perform
+   * @param targetAddresses: set of target addresses to compile
    * @return whether the execution is successful, additional message along with the execution
    * in a Pair object.
    */
-  public Pair<Boolean, Optional<String>> executeTask(Project currentProject, Set<String> targetAddressesToCompile, boolean useCleanAll) {
-    // If project has not changed since last Compile, return immediately.
-    if (!FileChangeTracker.shouldRecompileThenReset(currentProject, targetAddressesToCompile)) {
-      PantsExternalMetricsListenerManager.getInstance().logIsPantsNoopCompile(true);
-      Notification start = new Notification(PantsConstants.PANTS, "Pants Compile", "Already up to date.\n", NotificationType.INFORMATION);
-      Notifications.Bus.notify(start);
-      return Pair.create(true, Optional.of(PantsConstants.NOOP_COMPILE));
+  public TaskExecutionResult executeTask(
+      Project currentProject, String target, String description, List<String> preTargetArgs, Set<String> targetAddresses) {
+    if (currentProject == null) {
+      notify(description, "project not found", NotificationType.ERROR);
+      return new TaskExecutionResult(false, Optional.empty());
     }
 
     prepareIDE(currentProject);
-    if (targetAddressesToCompile.isEmpty()) {
+    if (targetAddresses.isEmpty()) {
       showPantsMakeTaskMessage("No target found in configuration.\n", ConsoleViewContentType.SYSTEM_OUTPUT, currentProject);
-      return Pair.create(true, Optional.empty());
+      return new TaskExecutionResult(true, Optional.empty());
     }
 
-    Optional<VirtualFile> pantsExecutable = PantsUtil.findPantsExecutable(currentProject);
-    if (!pantsExecutable.isPresent()) {
-      return Pair.create(
+    Optional<VirtualFile> findPantsResult = PantsUtil.findPantsExecutable(currentProject);
+    if (!findPantsResult.isPresent()) {
+      return new TaskExecutionResult(
         false,
         Optional.of(
-          PantsBundle.message("pants.error.no.pants.executable.by.path", currentProject.getProjectFilePath())
-        )
-      );
+          PantsBundle.message("pants.error.no.pants.executable.by.path", currentProject.getProjectFilePath())))
     }
-    final GeneralCommandLine commandLine = PantsUtil.defaultCommandLine(pantsExecutable.get().getPath());
+    VirtualFile pantsExecutable = findPantsResult.get();
+
+    final GeneralCommandLine commandLine = PantsUtil.defaultCommandLine(pantsExecutable.getPath());
 
     showPantsMakeTaskMessage("Checking Pants options...\n", ConsoleViewContentType.SYSTEM_OUTPUT, currentProject);
     Optional<PantsOptions> pantsOptional = PantsOptions.getPantsOptions(currentProject);
@@ -233,16 +249,6 @@ public class PantsMakeBeforeRun extends ExternalSystemBeforeRunTaskProvider {
     /* Global options section. */
     commandLine.addParameter(PantsConstants.PANTS_CLI_OPTION_NO_COLORS);
 
-    if (useCleanAll) {
-      commandLine.addParameter("clean-all");
-      if (pantsOptions.supportsAsyncCleanAll()) {
-        commandLine.addParameter(PantsConstants.PANTS_CLI_OPTION_ASYNC_CLEAN_ALL);
-      }
-    }
-    if (pantsOptions.supportsManifestJar()) {
-      commandLine.addParameter(PantsConstants.PANTS_CLI_OPTION_EXPORT_CLASSPATH_MANIFEST_JAR);
-    }
-
     PantsSettings settings = PantsSettings.getInstance(currentProject);
     if (settings.isUseIdeaProjectJdk()) {
       try {
@@ -253,12 +259,12 @@ public class PantsMakeBeforeRun extends ExternalSystemBeforeRunTaskProvider {
         return Pair.create(false, Optional.empty());
       }
     }
+    // add provided parameters before
+    commandLine.addParameters(preTargetArgs);
 
     /* Goals and targets section. */
-    commandLine.addParameters("export-classpath", "compile");
-    for (String targetAddress : targetAddressesToCompile) {
-      commandLine.addParameter(targetAddress);
-    }
+    commandLine.addParameter(target);
+    commandLine.addParameters(targetAddresses);
 
     final Process process;
     try {
@@ -284,31 +290,63 @@ public class PantsMakeBeforeRun extends ExternalSystemBeforeRunTaskProvider {
     processHandler.runProcess();
     runningPantsProcesses.remove(currentProject, process);
 
-    final boolean success = process.exitValue() == 0;
-    // Mark project dirty if compile failed.
-    if (!success) {
+    final boolean success = (process.exitValue() == 0);
+    if (success) {
+      notify(description, "succeeded", NotificationType.INFO);
+    } else {
+      notify(description, "failed", NotificationType.ERROR);
+    }
+
+    String finalOutString = String.join("", output);
+    return new TaskExecutionResult(success, Optional.of(finalOutString));
+  }
+
+  public TaskExecutionResult doCompile(Project currentProject, Set<String> targetAddressesToCompile, boolean useCleanAll) {
+    // If project has not changed since last Compile, return immediately.
+    if (!FileChangeTracker.shouldRecompileThenReset(currentProject, targetAddressesToCompile)) {
+      PantsExternalMetricsListenerManager.getInstance().logIsPantsNoopCompile(true);
+      Notification start = new Notification(PantsConstants.PANTS, "Pants Compile", "Already up to date.\n", NotificationType.INFORMATION);
+      Notifications.Bus.notify(start);
+      return Pair.create(true, Optional.of(PantsConstants.NOOP_COMPILE));
+    }
+
+    List<String> args = new ArrayList<String>();
+    if (useCleanAll) {
+      args.add("clean-all");
+      if (pantsOptions.supportsAsyncCleanAll()) {
+        args.add(PantsConstants.PANTS_CLI_OPTION_ASYNC_CLEAN_ALL);
+      }
+    }
+    if (pantsOptions.supportsManifestJar()) {
+      args.add(PantsConstants.PANTS_CLI_OPTION_EXPORT_CLASSPATH_MANIFEST_JAR);
+    }
+    args.add("export-classpath");
+
+    TaskExecutionResult result = executeTask(currentProject, "compile", "compile", args, targetAddressesToCompile);
+
+    if (result.success) {
+      FileChangeTracker.addManifestJarIntoSnapshot(currentProject);
+    } else {
+      // Mark project dirty if compile failed.
       FileChangeTracker.markDirty(currentProject);
     }
-    else {
-      FileChangeTracker.addManifestJarIntoSnapshot(currentProject);
-    }
-    notifyCompileResult(success);
+
     // Sync files as generated sources may have changed after Pants compile.
     PantsUtil.synchronizeFiles();
-    String finalOutString = String.join("", output);
-    Pair<Boolean, Optional<String>> result = Pair.create(success, Optional.of(finalOutString));
+
     return result;
   }
 
-  private void notifyCompileResult(final boolean success) {
+  private void notify(final String title, final String subtitle, final NotificationType type) {
   /* Show pop up notification about pants compile result. */
     ApplicationManager.getApplication().invokeLater(new Runnable() {
       @Override
       public void run() {
-        String message = success ? "Pants compile succeeded." : "Pants compile failed.";
-        NotificationType type = success ? NotificationType.INFORMATION : NotificationType.ERROR;
-        Notification start = new Notification(PantsConstants.PANTS, "Compile message", message, type);
-        Notifications.Bus.notify(start);
+        Notification notif = new Notification(PantsConstants.PANTS, PantsIcons.Icon, title, subtitle, type);
+        Notifications.Bus.notify(notif);
+        // String message = String.format("Pants %s %s", description, (success ? "succeeded" : "failed"));
+        // NotificationType type = success ? NotificationType.INFORMATION : NotificationType.ERROR;
+        // Notification start = new Notification(PantsConstants.PANTS, PantsIcons.Icon, "Compile message", message, type);
       }
     });
   }

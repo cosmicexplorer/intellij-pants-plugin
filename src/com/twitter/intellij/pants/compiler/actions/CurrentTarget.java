@@ -19,14 +19,31 @@ import java.util.stream.Stream;
 /**
  * PantsCompileCurrentTargetAction is a UI action that compiles target(s) related to the file under edit.
  */
-public class PantsCompileCurrentTargetAction extends PantsCurrentTarget {
-  public PantsCompileCurrentTargetAction() {
-    super("Compile target(s) in the selected editor", "compile");
+public abstract class CurrentTarget extends ActionBase {
+
+  public CurrentTarget(@NotNull String name, @NotNull String description) {
+    super(name, description);
   }
 
+  /**
+   * Find the target(s) that are only associated with the file opened in the selected editor.
+   */
   @NotNull
   @Override
-  public TaskExecutionResult operate(@NotNull project p, @NotNull PantsMakeBeforeRun runner) {
-    runner.doCompile(p, this.getTargets(p).collect(Collectors.toSet()), false);
+  public Stream<String> getTargets(@NotNull Project project) {
+
+    Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
+    if (editor != null && editor instanceof EditorImpl) {
+      VirtualFile fileUnderEdit = ((EditorImpl) editor).getVirtualFile();
+      Module moduleForFile = ProjectRootManager.getInstance(project).getFileIndex().getModuleForFile(fileUnderEdit);
+
+      if (moduleForFile == null) {
+        return Stream.empty();
+      }
+
+      return PantsUtil.getNonGenTargetAddresses(moduleForFile).stream();
+    }
+
+    return Stream.empty();
   }
 }

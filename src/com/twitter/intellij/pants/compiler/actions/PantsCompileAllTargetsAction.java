@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 /**
  * PantsCompileAllTargetsAction is a UI action that, when in a project, compiles all targets in the project
  */
-public class PantsCompileAllTargetsAction extends PantsCompileActionBase {
+public class PantsCompileAllTargetsAction extends PantsTarget {
 
   protected PantsCompileAllTargetsAction(String name) {
     super(name);
@@ -28,7 +28,7 @@ public class PantsCompileAllTargetsAction extends PantsCompileActionBase {
 
   @NotNull
   @Override
-  public Stream<String> getTargets(@NotNull AnActionEvent e, @NotNull Project project) {
+  public Stream<String> getTargets(@NotNull Project project) {
     return Arrays.stream(ModuleManager.getInstance(project).getModules())
       .map(PantsUtil::getNonGenTargetAddresses)
       .flatMap(Collection::stream);

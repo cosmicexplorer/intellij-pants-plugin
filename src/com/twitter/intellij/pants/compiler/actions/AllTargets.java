@@ -17,16 +17,22 @@ import org.jetbrains.annotations.NotNull;
 import java.util.stream.Stream;
 
 /**
- * PantsCompileCurrentTargetAction is a UI action that compiles target(s) related to the file under edit.
+ * PantsCompileAllTargetsAction is a UI action that compiles target(s) related to the file under edit.
  */
-public class PantsCompileCurrentTargetAction extends PantsCurrentTarget {
-  public PantsCompileCurrentTargetAction() {
-    super("Compile target(s) in the selected editor", "compile");
+public abstract class AllTargets extends ActionBase {
+
+  public AllTargets(@NotNull String name, @NotNull String description) {
+    super(name, description);
   }
 
+  /**
+   * Find the target(s) that are only associated with the file opened in the selected editor.
+   */
   @NotNull
   @Override
-  public TaskExecutionResult operate(@NotNull project p, @NotNull PantsMakeBeforeRun runner) {
-    runner.doCompile(p, this.getTargets(p).collect(Collectors.toSet()), false);
+  public Stream<String> getTargets(@NotNull Project project) {
+    return Arrays.stream(ModuleManager.getInstance(project).getModules())
+      .map(PantsUtil::getNonGenTargetAddresses)
+      .flatMap(Collection::stream);
   }
 }

@@ -8,6 +8,7 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.ProcessOutput;
 import com.intellij.openapi.project.Project;
 import com.twitter.intellij.pants.PantsException;
+import com.twitter.intellij.pants.util.OptionMap;
 import com.twitter.intellij.pants.util.PantsConstants;
 import com.twitter.intellij.pants.util.PantsUtil;
 import org.jetbrains.annotations.NotNull;
@@ -18,45 +19,37 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-
-public class PantsOptions {
+public class PantsOptions
+  extends HashMap<String, String>
+  // keep OptionMap interface even if superclass is changed
+  implements OptionMap<String, String> {
   /**
    * Cache of PantsOptions mapped from Pants executable files.
    */
   private static ConcurrentHashMap<File, PantsOptions> optionsCache = new ConcurrentHashMap<>();
 
-  private Map<String, String> options;
-
   public static void clearCache() {
     optionsCache.clear();
   }
 
-  public PantsOptions(final String rawOutput) {
-    options = parseOptions(rawOutput);
-  }
-
-  public boolean has(String optionName) {
-    return options.containsKey(optionName);
-  }
-
-  public Optional<String> get(String optionName) {
-    return Optional.ofNullable(options.get(optionName));
-  }
-
-  public static Optional<PantsOptions> getPantsOptions(final Project myProject) {
-    return PantsUtil.findPantsExecutable(myProject).map(file -> getPantsOptions(file.getPath()));
-  }
-
   public boolean supportsManifestJar() {
-    return has(PantsConstants.PANTS_OPTION_EXPORT_CLASSPATH_MANIFEST_JAR);
+    return this.containsKey(PantsConstants.PANTS_OPTION_EXPORT_CLASSPATH_MANIFEST_JAR);
   }
 
   public boolean supportsAsyncCleanAll() {
-    return has(PantsConstants.PANTS_OPTION_ASYNC_CLEAN_ALL);
+    return this.containsKey(PantsConstants.PANTS_OPTION_ASYNC_CLEAN_ALL);
   }
 
-  public static PantsOptions getPantsOptions(@NotNull final String pantsExecutable) {
-    File pantsExecutableFile = new File(pantsExecutable);
+  private static final String pantsPath(final VirtualFile pantsDir) {
+
+  }
+
+  public static Optional<PantsOptions> getPantsOptions(final Project myProject) {
+    return PantsUtil.findPantsExecutableDir(PantsUtil.potentialPantsLocations(myProject))
+      .map(file -> getPantsOptions(file.getPath()));
+  }
+
+  public static PantsOptions getPantsOptions(@NotNull final File pantsExecutableFile) {
     PantsOptions cache = optionsCache.get(pantsExecutableFile);
     if (cache != null) {
       return cache;
@@ -66,7 +59,7 @@ public class PantsOptions {
     exportCommandline.addParameters("options", PantsConstants.PANTS_CLI_OPTION_NO_COLORS);
     try {
       final ProcessOutput processOutput = PantsUtil.getCmdOutput(exportCommandline, null);
-      PantsOptions result = new PantsOptions(processOutput.getStdout());
+      PantsOptions result = new PantsOptions(parseOptions(processOutput.getStdout()));
       optionsCache.put(pantsExecutableFile, result);
       return result;
     }
