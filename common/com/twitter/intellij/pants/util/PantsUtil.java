@@ -840,6 +840,9 @@ public class PantsUtil {
     }
   }
 
+  // TODO: make findPantsExecutable(), findBuildRoot(), and all other dependent
+  // methods use one central logic path and avoid repetition
+  // TODO: cache result of findPantsExecutable(), etc (?)
   /**
    * Reliable way to find pants executable by a project once it is imported.
    * Use project's module in project to find the `buildRoot`,

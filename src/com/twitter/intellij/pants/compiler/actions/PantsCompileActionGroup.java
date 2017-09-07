@@ -8,7 +8,9 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.DefaultActionGroup;
+import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.module.ModuleUtil;
+import com.twitter.intellij.pants.util.PantsConstants;
 import com.twitter.intellij.pants.util.PantsUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,9 +29,12 @@ public class PantsCompileActionGroup extends ActionGroup {
   public AnAction[] getChildren(@Nullable AnActionEvent event) {
     //  Deletes existing make and compile options.
     ActionManager actionManager = ActionManager.getInstance();
-    DefaultActionGroup actionGroup = (DefaultActionGroup) actionManager.getAction("ProjectViewCompileGroup");
-    actionGroup.remove(actionManager.getAction("MakeModule"));
-    actionGroup.remove(actionManager.getAction("Compile"));
+
+    // TODO: don't remove these actions or put on our own unless we're in a
+    // pants project
+    DefaultActionGroup actionGroup = (DefaultActionGroup) actionManager.getAction(PantsConstants.ACTION_COMPILE_GROUP_ID);
+    actionGroup.remove(actionManager.getAction(IdeActions.ACTION_MAKE_MODULE));
+    actionGroup.remove(actionManager.getAction(IdeActions.ACTION_COMPILE));
 
     final AnAction[] emptyAction = new AnAction[0];
 

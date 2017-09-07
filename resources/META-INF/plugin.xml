@@ -12,7 +12,7 @@
       </ul>
       ]]>
   </change-notes>
-  <version>1.7.0</version>
+  <version>1.7.1</version>
   <vendor>Twitter, Inc.</vendor>
 
   <!--if you are changing since-build don't forget to change it in .travis.yml file as well-->
@@ -80,14 +80,8 @@
 
     <group id="Pants.Compile" text="Pants Compile" description="Pants compilation options" icon="PantsIcons.Icon"
            popup="true" class="com.twitter.intellij.pants.compiler.actions.PantsCompileActionGroup">
-      <add-to-group anchor="before" group-id="ProjectViewCompileGroup" relative-to-action="ProjectViewCompileGroup" />
-      <add-to-group group-id="Pants.Menu" anchor="first" />
-    </group>
-
-    <group id="Pants.Lint" text="Pants Lint" description="Pants linting options" icon="PantsIcons.Icon"
-           popup="true" class="com.twitter.intellij.pants.compiler.actions.PantsCompileActionGroup">
       <add-to-group group-id="ProjectViewCompileGroup" />
-      <add-to-group group-id="Pants.Menu" />
+      <add-to-group group-id="Pants.Menu" anchor="first" />
     </group>
   </actions>
 
