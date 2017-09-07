@@ -38,24 +38,34 @@ public class PantsCompileActionGroup extends ActionGroup {
 
     final AnAction[] emptyAction = new AnAction[0];
 
-    List<AnAction> actions = Optional.ofNullable(event)
-      // TODO: signal if no project found?
-      .flatMap(ev -> PantsUtil.optJoin(Optional.ofNullable(ev.getProject()),
-                                       IPantsGetTargets.getFileForEvent(ev)))
-      .flatMap(projectFile -> Optional.ofNullable(
-        ModuleUtil.findModuleForFile(projectFile.getSecond(), projectFile.getFirst())))
-      .flatMap(module -> Optional.of(PantsUtil.getNonGenTargetAddresses(module))
-        // TODO: signal if no addresses found?
-        .filter(addrs -> (addrs.size() > 0))
-        .map(addrs -> {
-          List<AnAction> result = new LinkedList<>();
-          if (addrs.size() > 1) {
-            result.add(new PantsCompileAllTargetsInModuleAction(module));
-          }
-          addrs.forEach(target -> result.add(new PantsCompileTargetAction(target)));
-          return result;
-        })
-      ).orElse(new LinkedList<>());
+    if (event == null) {
+      return emptyAction;
+    }
+    Project project = event.getProject();
+    Optional<VirtualFile> eventFile = IPantsGetTargets.getFileForEvent(event);
+    // TODO: signal if no project found?
+    if (project == null || !eventFile.isPresent()) {
+      return emptyAction;
+    }
+    VirtualFile file = eventFile.get();
+
+    Module module = ModuleUtil.findModuleForFile(file, project);
+    if (module == null) {
+      return emptyAction;
+    }
+
+    List<String> targetAddresses = PantsUtil.getNonGenTargetAddresses(module);
+    // TODO: signal if no addresses found?
+    if (targetAddresses.isEmpty()) {
+      return emptyAction;
+    }
+
+    List<AnAction> actions = new LinkedList<>();
+
+    if (targetAddresses.size() > 1) {
+      actions.add(new PantsCompileAllTargetsInModuleAction(module));
+    }
+    targetAddresses.forEach(target -> actions.add(new PantsCompileTargetAction(target)));
 
     return actions.toArray(emptyAction);
   }
