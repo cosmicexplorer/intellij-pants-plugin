@@ -10,6 +10,8 @@ fi
 rm -rf .cache/dummy_repo
 cp -r testData/dummy_repo .cache/
 
+pushd .cache
+pushd pants
 if [ -z ${PANTS_SHA+x} ]; then
   echo "Pulling the latest master..."
   git pull
