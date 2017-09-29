@@ -57,7 +57,7 @@ public class PantsResolveTest extends PantsCodeInsightFixtureTestCase {
     setUpPantsExecutable();
     myFixture.addFileToProject("foo/bar/BUILD", "");
     myFixture.configureByText("BUILD", "scala_library(dependencies=['fo<caret>o/bar']");
-    PsiElement element = doTest(0).iterator().next();
+    PsiElement element = doTest(1).iterator().next();
     assertTrue("Expected a directory!", element instanceof PsiDirectory);
     assertEquals("Wrong directory name", "foo", ((PsiDirectory) element).getName());
   }
