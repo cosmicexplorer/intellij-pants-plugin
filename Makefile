@@ -57,7 +57,7 @@ clean:
 	rm -rf $(CACHE_DIRS)
 
 test: all
-	$(RUN_TESTS) --test-junit-output-mode=ALL
+	TEST_SET=resolve $(RUN_TESTS) --test-junit-output-mode=ALL
 
 test-sparse: all
-	$(RUN_TESTS) --fail-fast --test-junit-output-mode=FAILURE_ONLY
+	TEST_SET=resolve $(RUN_TESTS) --fail-fast --test-junit-output-mode=FAILURE_ONLY
