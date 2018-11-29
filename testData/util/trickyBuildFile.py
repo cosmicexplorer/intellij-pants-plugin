@@ -17,9 +17,7 @@ bad_statement(not_name='this_is_not_a_target',
 jvm_binary(name = 'main-bin',
            dependencies = [
                pants('src/java/com/pants/examples/hello/greet'),
-               ],
-           resources=[
-               pants('src/resources/com/pants/example/hello'),
+               pants('src/resources/com/pants/example/hello')
                ],
            source = 'HelloMain.java',
            main = 'com.pants.examples.hello.main.HelloMain',

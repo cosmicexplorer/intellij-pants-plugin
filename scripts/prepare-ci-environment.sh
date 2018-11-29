@@ -62,6 +62,7 @@ append_intellij_jvm_options() {
   fi
 
   INTELLIJ_JVM_OPTIONS=(
+    "-Dide.mac.touchbar.use=false"
     "-Didea.load.plugins.id=${load_plugins}"
     "-Didea.plugins.path=$INTELLIJ_PLUGINS_HOME"
     "-Didea.home.path=$INTELLIJ_HOME"

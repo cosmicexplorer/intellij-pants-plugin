@@ -4,9 +4,7 @@ java_library(
         '3rdparty/intellij:sdk',
         '3rdparty/intellij:python-plugin',
         '3rdparty/intellij:scala-plugin',
-    ],
-    resources = [
-        ':properties'
+        ':properties',
     ],
     sources = rglobs('*.java')
 )
